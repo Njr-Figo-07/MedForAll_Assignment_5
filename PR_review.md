@@ -2,22 +2,22 @@
 
 ### Summary
 
-This is a Pull request review for the "Quick Add patient" feature that collects basic patient fields like first and last name, date of birth and email and POSTs them to `/api/patients`, calls an `onSuccess` callback, and navigates to the created patient's page. The overall flow is clear but there are several correctness, security, accessibility and robustness issues that needs to be addressed before merge, especially because this feature handles sensitive patient data like SSN, Insurance ID.
+This is a pull request review for the "Quick Add patient" feature that collects basic patient fields like first and last name, date of birth, and email then POSTs the data to `/api/patients`, calls an `onSuccess` callback, and navigates to the created patient's page. The overall flow is clear but there are several correctness, security, accessibility and robustness issues that need to be addressed before merge, especially because this feature handles sensitive patient data such as SSN and Insurance ID.
 
-### 1. Critical Issues
+### 1. Critical Issues (Must Fix Before Merge)
 
 #### 1.1 Missing `Content-Type` header + no error response handling
 
 **what:** The `fetch` call sends a JSON body but does not set `Content-Type: application/json`, and it parses JSON even if the response is an error.
 
-**why it matters:** Many APIs reply on content-type to parse requests. Also, calling `res.json()` on an error response can throw errors. Users may see confusing failures and the UI may navigate with bad data.
+**why it matters:** Many APIs rely on content-type to parse requests. Also, calling `res.json()` on an error response can throw errors. Users may see confusing failures and the UI may navigate with bad data.
 
 **how to fix:**
 ```
 const res = await fetch("/api/patients", {
     method: "POST",
     headers: { "Content-Type": "application/json"},
-    body: JSON.stringify(payload),
+    body: JSON.stringify(formData),
 });
 
 if (!res.ok) {
@@ -120,7 +120,7 @@ const [formData, setFormData] = useState<FormData>({
 
 * Trim strings
 * Validate email with basic regex expression
-* Ensure DOB is not in the future and age is reasonable
+* Ensure DOB is not in the future and that the calculated age falls within a reasonable range.
 
 ```
 const emailCheck = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim());
@@ -160,13 +160,13 @@ export default function QuickAddPatient({ onSuccess }: { onSuccess?: (p: any) =>
 
 ### 3. Suggestions
 
-#### 3.1 Show inline loading state and disbale inputs during submit
+#### 3.1 Show inline loading state and disable inputs during submit
 
 **what:** Only the button is disabled.
 
 **why it matters:** Users can keep editing while submit is happening, which can create confusion.
 
-**how to fix:** Add `disabled={loading}` to inputs or wrap in a `<fieldset disbaled={loading}>`.
+**how to fix:** Add `disabled={loading}` to inputs or wrap in a `<fieldset disabled={loading}>`.
 
 #### 3.2 Add a "Reset" button after success or on cancel
 
@@ -215,7 +215,7 @@ export default function QuickAddPatient({ onSuccess }: { onSuccess?: (p: any) =>
 const payload = {
     firstName: formData.firstName.trim(),
     lastName: formData.lastName.trim(),
-    dob: formData.dob.trim(),
+    dob: formData.dob,
     email: formData.email.trim(),
     phone: formData.phone.trim(),
     insuranceId: formData.insuranceId.trim(),
@@ -238,9 +238,9 @@ const age = useMemo(() => (formData.dob ? calculateAge(formData.dob) : undefined
 
 #### 5.2 Avoid recreating handlers unnecessarily
 
-**what:** Handlers are recreated on each render
+**what:** Handlers are recreated on each render. This is typically minor unless handlers are passed to deeply memoized children.
 
-**why:** Usually minorm relevant if passed deep
+**why:** Usually minor and only relevant if passed to deeply nested memoized components.
 
 **how to fix:** `useCallback` if needed.
 
@@ -277,9 +277,9 @@ const age = useMemo(() => (formData.dob ? calculateAge(formData.dob) : undefined
 
 #### 6.3 Add `required` and `autoComplete` attributes
 
-**what:** Required fields rely on only custom validation.
+**what:** Required fields rely solely on custom validation.
 
-**why:** Native browsers accessibility and UX improvments are missed.
+**why:** Native browser accessibility and UX improvements are missed.
 
 **how to fix:** 
 
@@ -306,3 +306,7 @@ const age = useMemo(() => (formData.dob ? calculateAge(formData.dob) : undefined
 3. `POSTs correct payload with Content-Type header`
 4. `handles non-200 response gracefully`
 5. `calls router.push with created id`
+
+### Conclusion
+
+Once the critical issues are addressed (request headers, error handling, stale state updates, and sensitive data handling), this component will be significantly more robust and suitable for a healthcare production environment.
